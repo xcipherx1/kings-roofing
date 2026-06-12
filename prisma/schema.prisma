@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  notes     Note[]
+
+  @@map("users")
+}
+
+model Lead {
+  id           String    @id @default(cuid())
+  name         String
+  email        String
+  phone        String
+  service      String?
+  message      String?
+  address      String?
+  status       Status    @default(NEW)
+  assignedToId String?
+  notes        Note[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("leads")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("notes")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum Status {
+  NEW
+  CONTACTED
+  QUOTED
+  IN_PROGRESS
+  COMPLETED
+  LOST
+  URGENT
+}
