@@ -49,3 +49,18 @@ model Note {
 
   @@map("Note")
 }
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum Status {
+  NEW
+  CONTACTED
+  QUOTED
+  IN_PROGRESS
+  COMPLETED
+  LOST
+  URGENT
+}
