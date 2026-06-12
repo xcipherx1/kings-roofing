@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Filter, Download, MoreVertical, Phone, Mail,
+  Search, Download, MoreVertical, Phone, Mail,
   ChevronLeft, ChevronRight, CheckCircle, X,
 } from "lucide-react";
 
@@ -41,35 +41,38 @@ export default function LeadsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [notes, setNotes] = useState<{ id: string; content: string; createdAt: string; author: { name: string } }[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const perPage = 10;
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("page", String(page));
-      params.set("perPage", String(perPage));
-      if (search) params.set("search", search);
+      params.set("limit", String(perPage));
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (statusFilter) params.set("status", statusFilter);
       const res = await fetch(`/api/leads?${params}`, { credentials: "include" });
       const data = await res.json();
-      setLeads(data.leads || []);
-      setTotal(data.pagination?.total || 0);
+      setLeads(data.items || []);
+      setTotal(data.total || 0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchLeads();
-  }, [page, statusFilter]);
+  }, [fetchLeads]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    fetchLeads();
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const updateStatus = async (id: string, status: string) => {
     await fetch(`/api/leads/${id}`, {
@@ -118,9 +121,8 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <form onSubmit={handleSearch} className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9B9B9B]" />
           <input
             type="text"
@@ -129,7 +131,7 @@ export default function LeadsPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-black/[0.08] rounded-lg text-sm outline-none focus:border-[#6A7B69] focus:ring-2 focus:ring-[rgba(106,123,105,0.15)]"
           />
-        </form>
+        </div>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -157,7 +159,6 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-black/[0.08] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -214,7 +215,6 @@ export default function LeadsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-black/[0.08] flex items-center justify-between">
             <span className="text-xs text-[#6B6B6B]">Showing {Math.min((page - 1) * perPage + 1, total)}-{Math.min(page * perPage, total)} of {total}</span>
@@ -238,110 +238,112 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Detail Panel */}
-      {detailOpen && selectedLead && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setDetailOpen(false)} />
+      <AnimatePresence>
+        {detailOpen && selectedLead && (
           <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.3, ease: EASE }}
-            className="relative w-full max-w-[480px] bg-white h-full overflow-y-auto shadow-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex justify-end"
           >
-            <div className="sticky top-0 bg-white border-b border-black/[0.08] px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <h2 className="font-display text-base font-semibold text-[#2C2C2C]">Lead Details</h2>
-                <span className="text-xs text-[#9B9B9B]">{new Date(selectedLead.createdAt).toLocaleDateString("en-GB")}</span>
-              </div>
-              <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-[#F5F4F1] rounded-lg transition-colors">
-                <X className="w-5 h-5 text-[#6B6B6B]" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Info */}
-              <div>
-                <h3 className="font-display text-lg font-semibold text-[#2C2C2C] mb-3">{selectedLead.name}</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-[#6B6B6B]"><Mail className="w-4 h-4" /> {selectedLead.email}</div>
-                  <div className="flex items-center gap-2 text-[#6B6B6B]"><Phone className="w-4 h-4" /> {selectedLead.phone}</div>
-                  {selectedLead.address && <div className="text-[#6B6B6B]">{selectedLead.address}</div>}
+            <div className="absolute inset-0 bg-black/30" onClick={() => setDetailOpen(false)} />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.3, ease: EASE }}
+              className="relative w-full max-w-[480px] bg-white h-full overflow-y-auto shadow-xl"
+            >
+              <div className="sticky top-0 bg-white border-b border-black/[0.08] px-6 py-4 flex items-center justify-between z-10">
+                <div>
+                  <h2 className="font-display text-base font-semibold text-[#2C2C2C]">Lead Details</h2>
+                  <span className="text-xs text-[#9B9B9B]">{new Date(selectedLead.createdAt).toLocaleDateString("en-GB")}</span>
                 </div>
-                <div className="mt-3">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[selectedLead.status] || ""}`}>
-                    {selectedLead.status}
-                  </span>
-                </div>
+                <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-[#F5F4F1] rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-[#6B6B6B]" />
+                </button>
               </div>
 
-              {/* Status Update */}
-              <div>
-                <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">Update Status</label>
-                <div className="flex flex-wrap gap-2">
-                  {Object.keys(statusColors).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => updateStatus(selectedLead.id, s)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        selectedLead.status === s ? statusColors[s] : "bg-[#F5F4F1] text-[#6B6B6B] hover:bg-[#E8E6E1]"
-                      }`}
-                    >
-                      {s.replace("_", " ")}
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="font-display text-lg font-semibold text-[#2C2C2C] mb-3">{selectedLead.name}</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-[#6B6B6B]"><Mail className="w-4 h-4" /> {selectedLead.email}</div>
+                    <div className="flex items-center gap-2 text-[#6B6B6B]"><Phone className="w-4 h-4" /> {selectedLead.phone}</div>
+                    {selectedLead.address && <div className="text-[#6B6B6B]">{selectedLead.address}</div>}
+                  </div>
+                  <div className="mt-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[selectedLead.status] || ""}`}>
+                      {selectedLead.status.replace("_", " ")}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">Update Status</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(statusColors).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => updateStatus(selectedLead.id, s)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          selectedLead.status === s ? statusColors[s] : "bg-[#F5F4F1] text-[#6B6B6B] hover:bg-[#E8E6E1]"
+                        }`}
+                      >
+                        {s.replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-display text-sm font-semibold text-[#2C2C2C] mb-3">Notes & Activity</h4>
+                  <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
+                    {notes.length === 0 ? (
+                      <p className="text-xs text-[#9B9B9B]">No notes yet</p>
+                    ) : (
+                      notes.map((note) => (
+                        <div key={note.id} className="p-3 bg-[#F5F4F1] rounded-lg">
+                          <p className="text-sm text-[#2C2C2C]">{note.content}</p>
+                          <div className="text-[10px] text-[#9B9B9B] mt-1">{note.author?.name || "Staff"} &middot; {new Date(note.createdAt).toLocaleDateString("en-GB")}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      placeholder="Add a note..."
+                      className="flex-1 px-3 py-2 bg-white border border-black/[0.08] rounded-lg text-sm outline-none focus:border-[#6A7B69]"
+                      onKeyDown={(e) => e.key === "Enter" && addNote()}
+                    />
+                    <button onClick={addNote} className="px-4 py-2 bg-[#3D5A3C] text-white text-xs font-medium rounded-lg hover:bg-[#2E4A2D] transition-colors">
+                      Add
                     </button>
-                  ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div>
-                <h4 className="font-display text-sm font-semibold text-[#2C2C2C] mb-3">Notes &amp; Activity</h4>
-                <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto">
-                  {notes.length === 0 ? (
-                    <p className="text-xs text-[#9B9B9B]">No notes yet</p>
-                  ) : (
-                    notes.map((note) => (
-                      <div key={note.id} className="p-3 bg-[#F5F4F1] rounded-lg">
-                        <p className="text-sm text-[#2C2C2C]">{note.content}</p>
-                        <div className="text-[10px] text-[#9B9B9B] mt-1">{note.author?.name || "Staff"} &middot; {new Date(note.createdAt).toLocaleDateString("en-GB")}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={noteContent}
-                    onChange={(e) => setNoteContent(e.target.value)}
-                    placeholder="Add a note..."
-                    className="flex-1 px-3 py-2 bg-white border border-black/[0.08] rounded-lg text-sm outline-none focus:border-[#6A7B69]"
-                    onKeyDown={(e) => e.key === "Enter" && addNote()}
-                  />
-                  <button onClick={addNote} className="px-4 py-2 bg-[#3D5A3C] text-white text-xs font-medium rounded-lg hover:bg-[#2E4A2D] transition-colors">
-                    Add
+                <div className="space-y-2 pt-4 border-t border-black/[0.08]">
+                  <button
+                    onClick={() => updateStatus(selectedLead.id, "COMPLETED")}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#3D5A3C] text-white text-sm font-medium rounded-lg hover:bg-[#2E4A2D] transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Mark as Completed
+                  </button>
+                  <button
+                    onClick={() => deleteLead(selectedLead.id)}
+                    className="w-full py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    Delete Lead
                   </button>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="space-y-2 pt-4 border-t border-black/[0.08]">
-                <button
-                  onClick={() => updateStatus(selectedLead.id, "COMPLETED")}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#3D5A3C] text-white text-sm font-medium rounded-lg hover:bg-[#2E4A2D] transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" /> Mark as Completed
-                </button>
-                <button
-                  onClick={() => deleteLead(selectedLead.id)}
-                  className="w-full py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  Delete Lead
-                </button>
-              </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }
