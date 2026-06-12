@@ -17,40 +17,30 @@ interface Lead {
   createdAt: string;
 }
 
-interface Stats {
-  totalLeads: number;
-  newThisWeek: number;
-  conversionRate: string;
-  avgResponseTime: string;
-}
-
 export default function DashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [stats, setStats] = useState<Stats>({ totalLeads: 0, newThisWeek: 0, conversionRate: "0%", avgResponseTime: "0h" });
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/leads", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : { leads: [], pagination: { total: 0 } })
+    fetch("/api/leads?page=1&limit=5", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : { items: [], total: 0 })
       .then((data) => {
-        const leadList = data.leads || [];
-        setLeads(leadList.slice(0, 5));
-        const total = data.pagination?.total || leadList.length;
-        setStats({
-          totalLeads: total,
-          newThisWeek: leadList.filter((l: Lead) => l.status === "NEW").length,
-          conversionRate: total > 0 ? `${Math.round((leadList.filter((l: Lead) => l.status === "COMPLETED").length / total) * 100)}%` : "0%",
-          avgResponseTime: "2.4h",
-        });
+        setLeads(data.items || []);
+        setTotal(data.total || 0);
       })
       .finally(() => setLoading(false));
   }, []);
 
+  const newThisWeek = leads.filter((l) => l.status === "NEW").length;
+  const completed = leads.filter((l) => l.status === "COMPLETED").length;
+  const conversionRate = total > 0 ? `${Math.round((completed / total) * 100)}%` : "0%";
+
   const statCards = [
-    { label: "Total Leads", value: stats.totalLeads, icon: Inbox, change: "+12%", positive: true },
-    { label: "New This Week", value: stats.newThisWeek, icon: TrendingUp, change: "+5%", positive: true },
-    { label: "Conversion Rate", value: stats.conversionRate, icon: CheckCircle, change: "+2%", positive: true },
-    { label: "Avg. Response", value: stats.avgResponseTime, icon: Clock, change: "-10%", positive: true },
+    { label: "Total Leads", value: total, icon: Inbox, change: "+12%", positive: true },
+    { label: "New This Week", value: newThisWeek, icon: TrendingUp, change: "+5%", positive: true },
+    { label: "Conversion Rate", value: conversionRate, icon: CheckCircle, change: "+2%", positive: true },
+    { label: "Avg. Response", value: "2.4h", icon: Clock, change: "-10%", positive: true },
   ];
 
   const statusColors: Record<string, string> = {
@@ -65,7 +55,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, i) => (
           <motion.div
@@ -88,7 +77,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent Leads */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -122,7 +110,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-[#2C2C2C] truncate">{lead.name}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[lead.status] || "bg-gray-100 text-gray-700"}`}>
-                      {lead.status}
+                      {lead.status.replace("_", " ")}
                     </span>
                   </div>
                   <div className="text-xs text-[#6B6B6B] mt-0.5">{lead.service || "General Enquiry"} &middot; {lead.email}</div>
