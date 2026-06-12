@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -17,7 +18,7 @@ model User {
   updatedAt DateTime @updatedAt
   notes     Note[]
 
-  @@map("users")
+  @@map("User")
 }
 
 model Lead {
@@ -34,7 +35,7 @@ model Lead {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@map("leads")
+  @@map("Lead")
 }
 
 model Note {
@@ -46,20 +47,5 @@ model Note {
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@map("notes")
-}
-
-enum Role {
-  ADMIN
-  STAFF
-}
-
-enum Status {
-  NEW
-  CONTACTED
-  QUOTED
-  IN_PROGRESS
-  COMPLETED
-  LOST
-  URGENT
+  @@map("Note")
 }
