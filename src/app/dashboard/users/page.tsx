@@ -38,10 +38,14 @@ export default function UsersPage() {
       .catch(() => router.push("/dashboard"));
   }, [router]);
 
-  const fetchUsers = () => {
+   const fetchUsers = () => {
     fetch("/api/users", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : { users: [] })
-      .then((data) => { setUsers(data.users || []); setLoading(false); });
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => {
+        const userList = Array.isArray(data) ? data : (data.users || []);
+        setUsers(userList);
+        setLoading(false);
+      });
   };
 
   const addUser = async (e: React.FormEvent) => {
