@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies()
     cookieStore.set('auth-token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
       path: '/',
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     })
-  } catch {
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
+  } catch (err: any) {
+    console.error('Login error:', err.message)
+    return NextResponse.json({ error: 'Login failed: ' + err.message }, { status: 500 })
   }
 }
